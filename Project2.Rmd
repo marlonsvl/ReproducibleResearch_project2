@@ -1,0 +1,205 @@
+---
+title: "Reproducible Research Course Project2"
+author: "Marlon Vinan"
+date: "2/2/2018"
+output: html_document
+keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Impact of storms in United States 
+
+## Sinopsys
+
+This is an important data analysis using R about the **Storm Data** published by the National Oceanic and Atmospheric Administration collected from 1950 - 2011. The aim of this work is try to respond i) Across the United States, which types of events are most harmful with respect to population health? and ii) Across the United States, which types of events have the greatest economic consequences?. With this background, the analysis was done using R where it shows that the most number of injuries was caused by tornado event with 26674 injuries and the most number of fatalitites was caused by excesive heat with 1903 fatalities. About the impact of economy, this data shows us that the worst event was the flood with 144 billion dolars of property damage, and the worst event for crop was drought with 14 billion of loss.    
+.....
+
+## Cofiguration Libraries
+```{r}
+
+echo = TRUE  # Allow code to always be displayed
+options(scipen = 1)  # Turn off scientific notation.
+library(ggplot2)
+
+```
+
+
+
+## Data processing 
+
+```{r, echo=TRUE, cache=TRUE}
+
+setwd("/Users/marlonvinan/Documents/Doctorado/Reproducible_research_course/project2" )
+filename <- "stormData.csv.bz2"
+if(!file.exists(filename)){
+    download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", destfile = "stormData.csv.bz2")
+}
+stormData <- read.csv("stormData.csv.bz2", sep = ",")
+dim(stormData)
+head(stormData)
+
+```
+There are 902297 rows with 37 variables or columns the next step is trasnform the BGN_DATE as DATE and after that get the year 
+
+
+```{r, echo=TRUE, cache=TRUE}
+
+stormData$year <- as.numeric(format(as.Date(stormData$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y"))
+
+hist(stormData$year, breaks = 30)
+
+```
+
+As we can see on the histogram above, the events begins to increment from 1990. The subset data from 1990 will be used.
+
+```{r, echo=TRUE, cache=TRUE}
+storms <- stormData[stormData$year >= 1990,]
+dim(storms)
+
+```
+
+After subsetting the data, the dimension is reduced to 751740 rows with 38 variables included 'year'
+
+## Impact in public Health
+
+In this chunk of code, I will try to get the number of **fatalities** and **injuries** that are caused by storms from 1990 to 2011. We sort in descending order to get the top 20 events by number of injuries and fatalities. Finally we can note that the highest number of injuries was produced by **TORNADO** and for fatalities was the **EXCESSIVE HEAT**
+
+```{r, echo=TRUE, cache=TRUE}
+
+############################ INJURIES ##############################
+injuries <- aggregate(storms$INJURIES, by = list(storms$EVTYPE), FUN = "sum")
+colnames(injuries) <- c("EVTYPE", "INJURIES")
+
+injuries <- data.frame(injuries)
+injuries <- injuries[order(-injuries$INJURIES),]
+### top 20 INJURIES
+injuries <- injuries[1:20,]
+injuries$EVTYPE <- factor(x = injuries$EVTYPE, levels = injuries$EVTYPE)
+############################ FATALITIES ##############################
+fatalities <- aggregate(storms$FATALITIES, by = list(storms$EVTYPE), FUN = "sum")
+colnames(fatalities) <- c("EVTYPE", "FATALITIES")
+
+fatalities <- data.frame(fatalities)
+fatalities <- fatalities[order(-fatalities$FATALITIES),]
+### top 20 INJURIES
+fatalities <- fatalities[1:20,]
+fatalities$EVTYPE <- factor(x = fatalities$EVTYPE, levels = fatalities$EVTYPE)
+
+injuries[1,]
+fatalities[1,]
+
+```
+
+## Impact on Economy
+
+Next, I will try to found the impact on economy using PROPDMGEXP and CROPDMGEXP. First of all, we convert these variables to numeric values.
+
+```{r, echo=TRUE, cache=TRUE}
+###################### PROPERTY DAMAGE ########################
+storms$PROPDMGEXP <- as.character(toupper(storms$PROPDMGEXP))
+
+index <- which(colnames(storms) == "PROPDMGEXP")
+storms[!is.na(storms[, index]) & storms$PROPDMGEXP == "B", index] <- "9"
+storms[!is.na(storms[, index]) & storms$PROPDMGEXP == "M", index] <- "6"
+storms[!is.na(storms[, index]) & storms$PROPDMGEXP == "K", index] <- "3"
+storms[!is.na(storms[, index]) & storms$PROPDMGEXP == "H", index] <- "2"
+storms[!is.na(storms[, index]) & storms$PROPDMGEXP == "", index] <- "0"
+storms$PROPDMGEXP <- as.numeric(storms$PROPDMGEXP)
+storms[is.na(storms[, index]), index] <- 0
+storms$propertyDamage <- storms[, index - 1] * 10 ^ storms$PROPDMGEXP
+
+
+###################### CROP DAMAGE ########################
+storms$CROPDMGEXP <- as.character(toupper(storms$CROPDMGEXP))
+index1 <- which(colnames(storms) == "CROPDMGEXP")
+storms[!is.na(storms[, index1]) & storms$CROPDMGEXP == "B", index1] <- "9"
+storms[!is.na(storms[, index1]) & storms$CROPDMGEXP == "M", index1] <- "6"
+storms[!is.na(storms[, index1]) & storms$CROPDMGEXP == "K", index1] <- "3"
+storms[!is.na(storms[, index1]) & storms$CROPDMGEXP == "H", index1] <- "2"
+storms[!is.na(storms[, index1]) & storms$CROPDMGEXP == "", index1] <- "0"
+storms$CROPDMGEXP <- as.numeric(storms$CROPDMGEXP)
+storms[is.na(storms[, index1]), index1] <- 0
+storms$cropDamage <- storms[, index1 - 1] * 10 ^ storms$CROPDMGEXP
+
+#######################################################
+property <- aggregate(storms$propertyDamage, by = list(storms$EVTYPE), FUN = "sum")
+colnames(property) <- c("EVTYPE", "propertyDamage")
+property <- data.frame(property)
+property <- property[order(-property$propertyDamage),]
+### top 20 property
+property <- property[1:20,]
+property$EVTYPE <- factor(x = property$EVTYPE, levels = property$EVTYPE)
+
+#######################################################
+crop <- aggregate(storms$cropDamage, by = list(storms$EVTYPE), FUN = "sum")
+colnames(crop) <- c("EVTYPE", "cropDamage")
+crop <- data.frame(crop)
+crop <- crop[order(-crop$cropDamage),]
+### top 20 crop
+crop <- crop[1:20,]
+crop$EVTYPE <- factor(x = crop$EVTYPE, levels = crop$EVTYPE)
+
+
+```
+
+## Results
+
+We have got a sorted list with severe events. Specifically, top 20 number of **fatalities** and **injuries** caused by storms events.
+
+```{r, echo=TRUE, cache=TRUE}
+library(ggplot2)
+#require(gridExtra)
+fatalities
+ggplot(data=fatalities, aes(x=fatalities$EVTYPE, y=fatalities$FATALITIES)) +
+  geom_bar(stat="identity", fill="steelblue")+ coord_flip() +
+  geom_text(aes(label=fatalities$FATALITIES), hjust=1.1, color="white", size=3.5)+
+    ggtitle("Total Fatalities by Severe Weather Events from 1990 - 2011")+
+    ylab("Number of fatalities") + xlab("Events")+
+  theme_minimal()
+
+injuries
+ggplot(data=injuries, aes(x=injuries$EVTYPE, y=injuries$INJURIES)) +
+  geom_bar(stat="identity", fill="steelblue")+ coord_flip() +
+  geom_text(aes(label=injuries$INJURIES), hjust=0.4,  size=3.5)+
+    ggtitle("Total Injuries by Severe Weather Events from 1990 - 2011")+
+    ylab("Number of injuries") + xlab("Events")+
+  theme_minimal()
+
+
+#grid.arrange(pfatalities, pinjuries, nrow = 2)
+
+```
+Based on the above figures, we found that the **excesive heat** and **tornado** caused the most fatalities. On the other hand, the **tornado** and **flood** caused the most injuries In the U.S.A. from 1990 to 2011.
+
+
+The same analysis was done for the impact on economy. We've got two sorted lists by the amount of money cost by damage
+
+```{r, echo=TRUE, cache=TRUE}
+library(ggplot2)
+property
+ggplot(data=property, aes(x=property$EVTYPE, y=property$propertyDamage)) +
+  geom_bar(stat="identity", fill="steelblue")+ coord_flip() +
+  geom_text(aes(label=property$propertyDamage),  size=3.5)+
+    ggtitle("Property damage by Severe Weather Events from 1990 - 2011")+
+    ylab("Property damage") + xlab("Events")+
+  theme_minimal()
+
+crop
+ggplot(data=crop, aes(x=crop$EVTYPE, y=crop$cropDamage)) +
+  geom_bar(stat="identity", fill="steelblue")+ coord_flip() +
+  geom_text(aes(label=crop$cropDamage), hjust=0.4,  size=3.5)+
+    ggtitle("Crop damage by Severe Weather Events from 1990 - 2011")+
+    ylab("Crop damage") + xlab("Events")+
+  theme_minimal()
+
+```
+
+As we can see on the figures above, we found that **flood** and **hurricane/typhoon** was the most destructive and they caused the most damage to property. On the other hand, **drought** and **flood** caused the most crop damage in U.S.A from 1990 to 2011
+
+
+## Conclusion
+
+This data can show us that **excesive heat**and **tornado** caused more fatalities than others events and the **tornado** caused the most injuries. The impact on economy was that the **flood** and **drought** caused the most damage in property and crop respectively.
